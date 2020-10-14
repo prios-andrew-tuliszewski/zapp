@@ -2,7 +2,8 @@ use actix_web::web;
 use diesel::prelude::*;
 use diesel::r2d2::ConnectionManager;
 use diesel::{
-    insert_into, BoolExpressionMethods, PgArrayExpressionMethods, QueryDsl, TextExpressionMethods,
+    debug_query, delete, insert_into, BoolExpressionMethods, PgArrayExpressionMethods, QueryDsl,
+    TextExpressionMethods,
 };
 use diesel::{PgConnection, RunQueryDsl};
 use r2d2::{Pool, PooledConnection};
@@ -12,6 +13,7 @@ use crate::models::Person;
 use crate::schema::person;
 use crate::schema::person::*;
 use crate::web::api::{CreatePersonRequest, QueryPersonRequest};
+use diesel::pg::Pg;
 
 #[derive(Debug)]
 pub struct PersonError {}
@@ -41,9 +43,10 @@ impl PersonRepo {
             created_dt: chrono::Local::now().naive_local(),
         };
 
-        let qr = insert_into(person::table)
-            .values(&new_record)
-            .get_result(&conn);
+        let q = insert_into(person::table).values(&new_record);
+
+        println!("{}", debug_query::<Pg, _>(&q));
+        let qr = q.get_result(&conn);
 
         qr.map_err(|_| PersonError {})
     }
@@ -60,14 +63,26 @@ impl PersonRepo {
         }
     }
 
+    pub fn delete_person(
+        db: web::Data<Pool<ConnectionManager<PgConnection>>>,
+        id: i32,
+    ) -> Result<usize, PersonError> {
+        let conn: PooledConnection<ConnectionManager<PgConnection>> = db.get().unwrap();
+
+        let q = delete(person::table.find(id));
+        println!("{}", debug_query::<Pg, _>(&q));
+
+        q.execute(&conn).map_err(|_| PersonError {})
+    }
+
     fn query_person_by_id(
         conn: PooledConnection<ConnectionManager<PgConnection>>,
         id: i32,
     ) -> Result<Vec<Person>, PersonError> {
-        person::table
-            .filter(person::person_id.eq(id))
-            .load::<Person>(&conn)
-            .map_err(|_| PersonError {})
+        let q = person::table.filter(person::person_id.eq(id));
+        println!("{}", debug_query::<Pg, _>(&q));
+
+        q.load::<Person>(&conn).map_err(|_| PersonError {})
     }
 
     fn query_person_by_names(
@@ -76,16 +91,28 @@ impl PersonRepo {
         l_name: Option<String>,
     ) -> Result<Vec<Person>, PersonError> {
         let result = match (f_name, l_name) {
-            (Some(f), Some(l)) => person::table
-                .filter(first_name.like(f))
-                .filter(last_name.like(l))
-                .load::<Person>(&conn),
-            (Some(f), None) => person::table
-                .filter(first_name.like(f))
-                .load::<Person>(&conn),
-            (None, Some(l)) => person::table
-                .filter(last_name.like(l))
-                .load::<Person>(&conn),
+            (Some(f), Some(l)) => {
+                let q = person::table
+                    .filter(first_name.like(f))
+                    .filter(last_name.like(l));
+
+                println!("{}", debug_query::<Pg, _>(&q));
+
+                q.load::<Person>(&conn)
+            }
+            (Some(f), None) => {
+                let q = person::table.filter(first_name.like(f));
+
+                println!("{}", debug_query::<Pg, _>(&q));
+
+                q.load::<Person>(&conn)
+            }
+            (None, Some(l)) => {
+                let q = person::table.filter(last_name.like(l));
+                println!("{}", debug_query::<Pg, _>(&q));
+
+                q.load::<Person>(&conn)
+            }
             (None, None) => person::table.load::<Person>(&conn),
         };
 

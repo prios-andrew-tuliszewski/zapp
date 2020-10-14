@@ -1,4 +1,4 @@
-use actix_web::{get, post, web, Error, HttpResponse, Responder};
+use actix_web::{delete, get, post, web, Error, HttpResponse, Responder};
 use diesel::r2d2::ConnectionManager;
 use diesel::PgConnection;
 use r2d2::Pool;
@@ -41,6 +41,17 @@ pub async fn query_person(
     item: web::Query<QueryPersonRequest>,
 ) -> Result<HttpResponse, Error> {
     Ok(web::block(move || PersonRepo::query_person(db, item.0))
+        .await
+        .map(|user| HttpResponse::Ok().json(user))
+        .map_err(|_| HttpResponse::InternalServerError())?)
+}
+
+#[delete("/person/{id}")]
+pub async fn delete_person(
+    db: web::Data<Pool<ConnectionManager<PgConnection>>>,
+    item: web::Path<i32>,
+) -> Result<HttpResponse, Error> {
+    Ok(web::block(move || PersonRepo::delete_person(db, item.0))
         .await
         .map(|user| HttpResponse::Ok().json(user))
         .map_err(|_| HttpResponse::InternalServerError())?)
