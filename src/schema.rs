@@ -6,5 +6,6 @@ table! {
         created_dt -> Timestamp,
         updated_dt -> Nullable<Timestamp>,
         deleted_dt -> Nullable<Timestamp>,
+        title -> Nullable<Varchar>,
     }
 }
