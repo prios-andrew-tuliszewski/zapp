@@ -1,5 +1,4 @@
 use chrono::naive;
-use diesel::sql_types::{Nullable, Timestamp};
 
 #[derive(Queryable, Serialize)]
 pub struct Person {

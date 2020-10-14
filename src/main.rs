@@ -14,7 +14,7 @@ mod models;
 mod schema;
 mod web;
 
-use crate::web::api::{create_person, delete_person, query_person};
+use crate::web::api::{create_person, delete_person, patch_person, query_person};
 use actix_web::{App, HttpServer};
 use diesel::r2d2::ConnectionManager;
 use diesel::PgConnection;
@@ -36,6 +36,7 @@ async fn main() -> std::io::Result<()> {
             .data(pool.clone())
             .service(create_person)
             .service(query_person)
+            .service(patch_person)
             .service(delete_person)
     })
     .bind("127.0.0.1:8081")?
