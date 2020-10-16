@@ -68,48 +68,20 @@ pub async fn patch_person(
 ) -> Result<HttpResponse, Error> {
     Ok(web::block(move || {
         PersonRepo::patch_person(db, id.0, item.0).map(|person| {
-            println!("Patched id {}", id.0);
-            let p_copy = person.clone();
-
             let map = state.subscriptions.read().unwrap();
             let values = map.get(&id.0);
-            println!("Got map {}", values.is_some());
 
             values.iter().for_each(|actors_rwl| {
-                println!("Have a list of subs");
                 actors_rwl.read().unwrap().deref().iter().for_each(|actor| {
-                    println!("Sending to actor");
-                    actor.do_send(p_copy.clone());
-
-                    // println!("{:?}", request.);
+                    actor.do_send(person.clone());
                 });
-                ()
             });
-            println!("Returning person");
             person
         })
     })
     .await
     .map(|user| HttpResponse::Created().json(user))
     .map_err(|_| HttpResponse::InternalServerError())?)
-
-    // let person: Arc<Result<Person, PersonError>> = Arc::new(result);
-    // let person_copy = Arc::clone(&person);
-    //
-    // let mut map: RwLockWriteGuard<
-    //     HashMap<i32, RwLock<Vec<Addr<PersonSubscription>>>, RandomState>,
-    // > = state.subscriptions.write().unwrap();
-    // map.get(&id.0).iter().for_each(|actors| {
-    //     actors.read().unwrap().deref().iter().for_each(|actor| {
-    //         let _ = person_copy.iter().for_each(|p| {
-    //             let m1: Person = p.clone();
-    //             let _ = actor.send(m1);
-    //             ()
-    //         });
-    //
-    //         ()
-    //     })
-    // });
 }
 
 /*
