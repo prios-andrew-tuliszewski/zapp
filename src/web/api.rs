@@ -1,17 +1,3 @@
-use actix::{Actor, Addr, Handler, StreamHandler};
-use actix_web::{delete, get, patch, post, web, Error, HttpRequest, HttpResponse, Responder};
-use actix_web_actors::ws;
-use diesel::r2d2::ConnectionManager;
-use diesel::PgConnection;
-use r2d2::Pool;
-
-use crate::data::person::{PersonError, PersonRepo};
-use crate::models::{to_ws_person, Person, WsPerson, WsPerson2};
-use crate::schema::person;
-use crate::AppState;
-use actix::prelude::Request;
-use actix_web::body::Body;
-use chrono::naive;
 use std::borrow::{Borrow, BorrowMut};
 use std::cell::RefCell;
 use std::collections::hash_map::RandomState;
@@ -19,6 +5,21 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::rc::Rc;
 use std::sync::{Arc, RwLock, RwLockWriteGuard};
+
+use actix::prelude::Request;
+use actix::{Actor, Addr, Handler, StreamHandler};
+use actix_web::body::Body;
+use actix_web::{delete, get, patch, post, web, Error, HttpRequest, HttpResponse, Responder};
+use actix_web_actors::ws;
+use chrono::naive;
+use diesel::r2d2::ConnectionManager;
+use diesel::PgConnection;
+use r2d2::Pool;
+
+use crate::data::person::{PersonError, PersonRepo};
+use crate::models::{to_ws_person, Person, WsPerson};
+use crate::schema::person;
+use crate::AppState;
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct CreatePersonRequest {
@@ -58,35 +59,6 @@ pub struct PatchPersonRecord {
     pub updated_dt: naive::NaiveDateTime,
 }
 
-// pub fn test_move() {
-//     web::block(move || {
-//         let p = Person {
-//             id: 0,
-//             first_name: "".to_string(),
-//             last_name: "".to_string(),
-//             created_dt: chrono::Local::now().naive_local(),
-//             updated_dt: None,
-//             deleted_dt: None,
-//             title: None,
-//         };
-//
-//         let opt = Some(1);
-//         opt.iter().for_each(|_| {
-//             let c = p.clone();
-//             let w = WsPerson {
-//                 id: 0,
-//                 first_name: c.first_name.into_boxed_str(),
-//             };
-//             move_ws_person(w);
-//         });
-//
-//         Ok(p)
-//     });
-//     ()
-// }
-
-pub fn move_ws_person(ws_person: WsPerson) {}
-
 #[patch("/person/{id}")]
 pub async fn patch_person(
     db: web::Data<Pool<ConnectionManager<PgConnection>>>,
@@ -97,8 +69,8 @@ pub async fn patch_person(
     Ok(web::block(move || {
         PersonRepo::patch_person(db, id.0, item.0).map(|person| {
             println!("Patched id {}", id.0);
-            let ws_person = to_ws_person(person.clone());
-            println!("Converted");
+            let p_copy = person.clone();
+
             let map = state.subscriptions.read().unwrap();
             let values = map.get(&id.0);
             println!("Got map {}", values.is_some());
@@ -107,12 +79,7 @@ pub async fn patch_person(
                 println!("Have a list of subs");
                 actors_rwl.read().unwrap().deref().iter().for_each(|actor| {
                     println!("Sending to actor");
-                    let ws2 = ws_person.clone();
-                    let s = Box::new(ws2.first_name.as_ref().clone());
-                    actor.do_send(WsPerson2 {
-                        id: ws2.id,
-                        first_name: "",
-                    });
+                    actor.do_send(p_copy.clone());
 
                     // println!("{:?}", request.);
                 });
@@ -196,8 +163,6 @@ impl Actor for PersonSubscription {
 /// Handler for ws::Message message
 impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PersonSubscription {
     fn handle(&mut self, msg: Result<ws::Message, ws::ProtocolError>, ctx: &mut Self::Context) {
-        println!("handling message");
-
         match msg {
             Ok(ws::Message::Ping(msg)) => ctx.pong(&msg),
             Ok(ws::Message::Text(text)) => ctx.text(text),
@@ -207,12 +172,12 @@ impl StreamHandler<Result<ws::Message, ws::ProtocolError>> for PersonSubscriptio
     }
 }
 
-impl<'a> Handler<WsPerson2<'a>> for PersonSubscription {
+impl<'a> Handler<Person> for PersonSubscription {
     type Result = ();
 
-    fn handle(&mut self, msg: WsPerson2, ctx: &mut Self::Context) -> Self::Result {
+    fn handle(&mut self, msg: Person, ctx: &mut Self::Context) -> Self::Result {
         println!("received message");
-        let p_json = serde_json::to_string::<WsPerson2>(&msg);
+        let p_json = serde_json::to_string::<Person>(&msg);
 
         match p_json {
             Ok(json) => {

@@ -1,7 +1,8 @@
 use actix::prelude::*;
 use chrono::naive;
 
-#[derive(Queryable, Serialize)]
+#[derive(Message, Queryable, Serialize)]
+#[rtype(result = "()")]
 pub struct Person {
     pub id: i32,
     pub first_name: String,
@@ -17,18 +18,6 @@ pub struct Person {
 pub struct WsPerson {
     pub id: i32,
     pub first_name: Box<str>,
-    // pub last_name: &'a str,
-    // pub created_dt: naive::NaiveDateTime,
-    // pub updated_dt: Option<naive::NaiveDateTime>,
-    // pub deleted_dt: Option<naive::NaiveDateTime>,
-    // pub title: Option<&'a str>,
-}
-
-#[derive(Message, Serialize, Copy, Clone)]
-#[rtype(result = "()")]
-pub struct WsPerson2<'a> {
-    pub id: i32,
-    pub first_name: &'a str,
     // pub last_name: &'a str,
     // pub created_dt: naive::NaiveDateTime,
     // pub updated_dt: Option<naive::NaiveDateTime>,
