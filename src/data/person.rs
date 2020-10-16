@@ -74,7 +74,10 @@ impl PersonRepo {
         let q = update(person::table.filter(person::person_id.eq(i))).set(&rr);
         println!("{}", debug_query::<Pg, _>(&q));
 
-        q.get_result(&conn).map_err(|_| PersonError {})
+        q.get_result(&conn).map_err(|e| {
+            println!("{:?}", e);
+            PersonError {}
+        })
     }
 
     pub fn query_person(
@@ -99,6 +102,10 @@ impl PersonRepo {
         println!("{}", debug_query::<Pg, _>(&q));
 
         q.execute(&conn).map_err(|_| PersonError {})
+    }
+
+    pub fn subscribe_person(id: i32) -> Result<(), PersonError> {
+        Ok(())
     }
 
     fn query_person_by_id(
